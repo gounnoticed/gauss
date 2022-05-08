@@ -1,0 +1,529 @@
+
+#include <vector>
+#include <algorithm>
+#include <cassert>
+#include <iostream>
+#include <chrono>
+#include <bitset>
+
+using myInt = unsigned long;
+using myCount = long;
+using myIndex = int;
+using myVec = std::vector<myInt>;
+
+using PrimeList = std::vector<myInt>;
+using IndexList = std::vector<myIndex>;
+using FactorList = std::vector<myCount>;
+
+const myInt modValue = 1'000'000'007;
+const myInt GBigValue = 100'000'000;
+const myInt G10Correct = 23'044'331'520'000;
+
+PrimeList primes = {2, 3, 5, 7, 11};
+FactorList prod = {};
+myInt prodVal = 1;
+FactorList Gval = {};
+
+inline myInt ModMul(myInt val1, myInt val2)
+{
+    //return val1 * val2;
+    myInt x = (val1 * val2);
+    if (x > modValue)
+        x = x % modValue;
+    return x;
+}
+
+myInt ModMulPower(myInt val, myInt power)
+{
+    if ( power == 0 ) 
+        return 1;
+    if (power == 1)
+        return val;
+    if (power == 2)
+        return ModMul(val, val);
+
+    myInt dval = ModMul(val, val);
+    if (power % 2 == 1)
+        return ModMul(ModMulPower(dval, power / 2), val);
+    else
+        return ModMulPower(dval, power / 2);
+}
+
+std::ostream &operator<<(std::ostream &os, const myVec &vec)
+{
+    int i = 0;
+    os << " vector size " << vec.size() << " ";
+    for (auto &&next : vec)
+    {
+        os << " " << next;
+        if (++i % 10 == 0)
+        {
+            os << "\n";
+        }
+    }
+    return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const IndexList &vec)
+{
+    int i = 0;
+    bool start = false;
+
+    for (auto &&next : vec)
+    {
+        if (start)
+            os << ",";
+        start = true;
+        os << primes[next];
+        if (++i % 10 == 0)
+        {
+            os << "\n";
+        }
+    }
+    return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const FactorList &vec)
+{
+    int count = 0;
+    myInt val = 1;
+    for (int i = 0; i < vec.size(); ++i)
+    {
+        long pow = vec[i];
+        if (pow > 0)
+        {
+            myInt p = primes[i];
+
+            if (count > 0)
+            {
+                os << "*";
+            }
+
+            os << primes[i] << "^" << pow;
+            count++;
+            if (count % 10 == 0)
+            {
+                os << "\n";
+            }
+        }
+    }
+
+    return os;
+}
+
+myInt GetValForFactorList(const FactorList &vec)
+{
+    myInt total = 1;
+    myIndex i = 0;
+    for (myCount x : vec)
+    {
+        assert(x >= 0);
+        if (x > 0)
+        {
+            myInt prime = primes[i];
+            for (int j = 0; j < x; ++j)
+            {
+                total = ModMul(total, prime);
+            }
+        }
+        ++i;
+    }
+    return total;
+}
+
+inline bool HasFactors(const myInt test, PrimeList &factors)
+{
+    for (auto &&f : factors)
+    {
+        if (f > test)
+            break;
+        if (test % f == 0)
+            return true;
+    }
+    return false;
+}
+
+inline myInt NextPrime(myInt index)
+{
+    while (index >= primes.size())
+    {
+        myInt test = primes.back() + 2;
+        for (;;)
+        {
+            if (!HasFactors(test, primes))
+            {
+                {
+                    primes.push_back(test);
+                }
+                if (primes.size() % 1000 == 0)
+                {
+                    std::cout << "P " << primes.back() << " is " << primes.size() << "\n";
+                }
+
+                break;
+            }
+            else
+            {
+                test = test + 2;
+            }
+        }
+    }
+    return primes[index];
+}
+
+void GetIndexListForValue(myInt test, IndexList &indexes)
+{
+    myInt index = 0;
+    //indexes.clear();
+    while (test > 1)
+    {
+        myInt nextp = NextPrime(index);
+        while (test % nextp == 0)
+        {
+            test = test / nextp;
+            indexes.push_back(index); //note can add same value several times!
+        }
+        ++index;
+    }
+}
+
+void ConvertIndexListToPrimeList(PrimeList &pList, const IndexList &indexes)
+{
+    //pList.clear();
+    for (auto &&i : indexes)
+    {
+        pList.push_back(primes[i]);
+    }
+}
+
+void GetPrimeListForValue(myInt test, PrimeList &pList)
+{
+    IndexList indexes;
+    GetIndexListForValue(test, indexes);
+    ConvertIndexListToPrimeList(pList, indexes);
+}
+
+void AddPosToFactorList(myInt pos, FactorList &factList, myCount increment)
+{
+    if (factList.size() <= pos)
+    {
+        factList.insert(factList.end(), pos - factList.size() + 1, 0);
+        factList.reserve(factList.size() + 1000);
+    }
+    factList[pos] += increment;
+}
+
+void AddIndexListToFactorList(const IndexList &addVac, FactorList &resultVac, myInt number = 1)
+{
+    std::for_each(begin(addVac), end(addVac), [&resultVac, &number](myIndex index)
+                  { AddPosToFactorList(index, resultVac, number); });
+}
+
+void AddFactorListToFactorList(const FactorList &addFac, FactorList &resultVac)
+{
+    int i = 0;
+    for (auto &&fac : addFac)
+    {
+        if (fac > 0)
+        {
+            AddPosToFactorList(i, resultVac, fac);
+        }
+        ++i;
+    }
+}
+
+void GetFactorListForValue(myInt test, FactorList &factors)
+{
+    myInt index = 0;
+    factors.clear();
+    while (test > 1)
+    {
+        myInt nextp = NextPrime(index);
+        while (test % nextp == 0)
+        {
+            test = test / nextp;
+            AddPosToFactorList(index, factors, 1);
+            ;
+        }
+        ++index;
+    }
+}
+
+bool FactorListDividesFactorList(const FactorList &bigVal, const FactorList &smallVal)
+{
+    for (myIndex i = 0; i < smallVal.size(); ++i)
+    {
+        myCount count = smallVal[i];
+        if (count > 0)
+        {
+            if (bigVal.size() < i || count > bigVal[i])
+                return false;
+        }
+    }
+    return true;
+}
+
+void RemoveFactorList(FactorList &bigVal, FactorList &smallVal)
+{
+    for (myIndex i = 0; i < smallVal.size(); ++i)
+    {
+        myCount count = smallVal[i];
+        if (count > 0)
+        {
+            assert(count >= bigVal[i]);
+            bigVal[i] -= count;
+        }
+    }
+}
+
+bool IsInFactorList(const myIndex test, const myIndex pos, const IndexList &testF)
+{
+    bool result = false;
+
+    for (int i = 0; i < pos; ++i)
+    {
+        if (test == testF[i])
+            result = true;
+        break;
+    }
+    return result;
+}
+
+myVec removedList;
+
+void RemoveIndexFromFactorList(const int ind, const IndexList &checkVac, FactorList &resultVac)
+{
+    FactorList v;
+    myIndex primeIndex = checkVac[ind];
+    myInt prime = primes[primeIndex];
+
+    myIndex i = 1;
+    for (;;)
+    {
+        myInt checkValue = myInt(i) * prime;
+        assert(checkValue >= prodVal);
+        auto it = std::lower_bound(begin(removedList), end(removedList), checkValue);
+        if ((it == end(removedList)) || (*it != checkValue))
+        {
+            removedList.insert(it, checkValue);
+            GetFactorListForValue(i, v);
+            AddPosToFactorList(primeIndex, v, 1);
+            RemoveFactorList(resultVac, v);
+        }
+        ++i;
+    }
+}
+
+void RemoveIndexListFromFactorList(const IndexList &addVac, FactorList &resultVac)
+{
+    removedList.clear();
+
+    if (addVac.size() > 0)
+    {
+        myIndex prev = addVac.back() + 1;
+        for (int i = 0; i < addVac.size(); ++i)
+        {
+            if (addVac[i] != prev)
+            {
+                RemoveIndexFromFactorList(i, addVac, resultVac);
+            }
+            prev = addVac[i];
+        }
+    }
+}
+
+void prodNext()
+{
+    prodVal++;
+    IndexList indForNextProd;
+    GetIndexListForValue(prodVal, indForNextProd);
+    AddIndexListToFactorList(indForNextProd, prod);
+}
+
+void NextG()
+{
+    prodVal++;
+    IndexList indForNextProd;
+    GetIndexListForValue(prodVal, indForNextProd);
+    AddFactorListToFactorList(prod, Gval);
+    RemoveIndexListFromFactorList(indForNextProd, Gval);
+    AddIndexListToFactorList(indForNextProd, prod);
+}
+
+myInt g(myInt val)
+{
+    PrimeList valFactors;
+    myInt prod = 1;
+    GetPrimeListForValue(val, valFactors);
+    for (myInt i = 2; i < val; ++i)
+    {
+        if (!HasFactors(i, valFactors))
+        {
+            prod = ModMul(prod, i);
+        }
+    }
+    return prod;
+}
+
+myInt BigFactorForN(myInt G, myInt val, PrimeList &valFactors);
+
+myInt BigFactorForPrime(myInt G, myInt val)
+{
+    PrimeList valFactors;
+    valFactors.push_back(val);
+    return BigFactorForN(G, val, valFactors);
+}
+
+std::bitset<GBigValue + 1> doubleCount;
+
+myInt BigFactorForN(myInt G, myInt val, PrimeList &valFactors)
+{
+    myInt res = 0;
+    myInt GoverVal = G / val;
+    myInt GmodVal = G % val;
+    bool isPrime = valFactors.size() == 1;
+    assert(val > 1);
+
+    auto CalcNumberPerVal = [&val, &valFactors](long &numberPerVal)
+    {
+        myInt last = 0;
+        const long initVal = numberPerVal;
+        for (int i = 1; i <= initVal; i++)
+        {
+            doubleCount.reset(i);
+        }
+        for (int i = 0; i < valFactors.size(); ++i)
+        {
+            myInt p = valFactors[i];
+            if (last != p)
+            {
+                last = p;
+
+                for (; p <= initVal; p += last)
+                {
+                    doubleCount.set(p, true);
+                }
+            }
+        }
+        numberPerVal = 0;
+        for (int i = 1; i <= initVal; ++i)
+        {
+            if (!doubleCount.test(i))
+                ++numberPerVal;
+        }
+        assert(numberPerVal >= 0);
+    };
+
+    if (GoverVal > 1)
+    {
+        long numberPerVal;
+        if (!isPrime)
+        {
+            numberPerVal = val;
+            CalcNumberPerVal(numberPerVal);
+        }
+        else
+        {
+            numberPerVal = val - 1;
+        }
+        assert(numberPerVal > 0);
+        res += (GoverVal - 1) * numberPerVal;
+    }
+    if (isPrime)
+    {
+        res += GmodVal;
+    }
+    else
+    {
+        if (GmodVal > 0)
+        {
+            long count = GmodVal;
+            CalcNumberPerVal(count);
+            res += count;
+        }
+    }
+    return res;
+}
+
+PrimeList valFactors1;
+myInt AddValForG(myInt G, FactorList &ans, myInt val)
+{
+    valFactors1.clear();
+
+    GetPrimeListForValue(val, valFactors1);
+    myInt uptick = BigFactorForN(G, val, valFactors1);
+
+    //AddIndexListToFactorList(index, ans, uptick);
+    return uptick;
+}
+
+void CalcGFromScratch(myInt G, FactorList &ans)
+{
+    ans.clear();
+    auto start = std::chrono::steady_clock::now();
+    myInt g_i = 1;
+    const long reportTime = 10;
+    long increment = G / reportTime;
+
+    for (myInt count = G-1; count > 1; --count)
+    {
+
+        if (count % reportTime == 0)
+        {
+            auto endtime = std::chrono::steady_clock::now();
+            std::chrono::duration<double> elapsed = endtime - start;
+            //std::cout << "G(" << G << ") count =" << count << "\n";
+            std::cout << "reached " << count << "\n";
+            //std::cout << "res = " << g_i << "\n";
+            //std::cout << ans << "\n";
+            std::cout << "Seconds to go " << elapsed.count() * (--increment) << "\n";
+            start = endtime;
+        }
+        myInt addG = AddValForG(G, ans, count);
+        g_i = ModMul(g_i, ModMulPower(count, addG));
+    }
+    std::cout << "G(" << G << ") " << g_i << "\n";
+}
+
+int main()
+{
+    myInt bigG_i = 1;
+    myInt alg2bigG = 1;
+
+    FactorList newG;
+    CalcGFromScratch(GBigValue, newG);
+
+    std::cout << newG << "\n";
+
+    prodVal = 1;
+
+    for (myInt i = 2; i <= 100'000'001; i++)
+    {
+        myInt g_i = g(i);
+        bigG_i = ModMul(g_i, bigG_i);
+
+        //NextG();
+
+        CalcGFromScratch(i, newG);
+
+        //std::cout << "wrong G( " << i << ") " << newG;
+
+        //std::cout << "right G( " << prodVal << ") " << Gval;
+
+        alg2bigG = GetValForFactorList(newG);
+
+        if (alg2bigG != bigG_i)
+        {
+            std::cout << " not matching with G(" << i << ")"
+                      << std::endl;
+            break;
+        }
+
+        if (i % 1000 == 0)
+        {
+
+            std::cout << "G(" << i << ") = " << bigG_i << "\n";
+            std::cout << newG << "\n";
+        }
+    }
+}
